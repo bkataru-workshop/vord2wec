@@ -5,15 +5,22 @@ from collections import defaultdict, Counter
 
 import numpy as np
 
+
 class MinimalWord2Vec:
     """
     A minimal Word2Vec implementation from scratch using only NumPy.
     This implements the Skip-gram model with negative sampling.
     """
 
-    def __init__(self, embedding_dim: int = 100, window_size: int = 5,
-                min_count: int = 5, negative_samples: int = 5,
-                learning_rate: float = 0.025, epochs: int = 10):
+    def __init__(
+        self,
+        embedding_dim: int = 100,
+        window_size: int = 5,
+        min_count: int = 5,
+        negative_samples: int = 5,
+        learning_rate: float = 0.025,
+        epochs: int = 10,
+    ):
         """
         Initialize the Word2Vec model.
 
@@ -33,14 +40,14 @@ class MinimalWord2Vec:
         self.epochs = epochs
 
         # These will be initialized during training
-        self.word_to_idx = {} # Maps words to indices
-        self.idx_to_word = {} # Maps indices back to words
-        self.word_counts = Counter() # How often each word appears
+        self.word_to_idx = {}  # Maps words to indices
+        self.idx_to_word = {}  # Maps indices back to words
+        self.word_counts = Counter()  # How often each word appears
         self.vocab_size = 0
 
         # The actual embedding matrices - these are what we're trying to learn
-        self.W_in = None # Input embeddings (center word representations)
-        self.W_out = None # Output embeddings (context word representations)
+        self.W_in = None  # Input embeddings (center word representations)
+        self.W_out = None  # Output embeddings (context word representations)
 
         # For negative sampling - words with higher frequency get sampled more often
         self.negative_sampling_table = None
@@ -48,10 +55,10 @@ class MinimalWord2Vec:
     def preprocess_text(self, text: str) -> [str]:
         """
         Clean and tokenize the input text.
-        This is a simple preprocessing recipe - in practice use a better pipeline pls 
+        This is a simple preprocessing recipe - in practice use a better pipeline pls
         """
         # Convert to lowercase and remove non-alphabetic characters
-        text = re.sub(r'[^a-zA-Z\s]', '', text.lower())
+        text = re.sub(r"[^a-zA-Z\s]", "", text.lower())
 
         # Split into words
         words = text.split()
@@ -68,7 +75,9 @@ class MinimalWord2Vec:
                 self.word_counts[word] += 1
 
         # Filter out rare words
-        filtered_words = [word for word, count in self.word_counts.items() if count >= self.min_count]
+        filtered_words = [
+            word for word, count in self.word_counts.items() if count >= self.min_count
+        ]
 
         # Create mappings between words and indices
         self.word_to_idx = {word: idx for idx, word in enumerate(filtered_words)}
@@ -81,17 +90,23 @@ class MinimalWord2Vec:
     def initialize_embeddings(self):
         """
         Initialize the embedding matrices with random small values.
-        We use two matrices: one for input (center words) and one for output (context words). 
+        We use two matrices: one for input (center words) and one for output (context words).
         """
         # Initialize with small random values - this is crucial for training
-        self.W_in = np.random.uniform(-0.5, 0.5, (self.vocab_size, self.embedding_dim)) / self.embedding_dim
-        self.W_out = np.random.uniform(-0.5, 0.5, (self.vocab_size, self.embedding_dim)) / self.embedding_dim
+        self.W_in = (
+            np.random.uniform(-0.5, 0.5, (self.vocab_size, self.embedding_dim))
+            / self.embedding_dim
+        )
+        self.W_out = (
+            np.random.uniform(-0.5, 0.5, (self.vocab_size, self.embedding_dim))
+            / self.embedding_dim
+        )
 
     def create_negative_sampling_table(self, table_size: int = 100000):
         """
         Create a table for efficient negative sampling.
         Words with higher frequency appear more often in the table.
-        Uses the word2vec paper's formula: count^(3/4) for subsampling frequent words. 
+        Uses the word2vec paper's formula: count^(3/4) for subsampling frequent words.
         """
         # Calculate sampling probabilities
         total_count = sum(self.word_counts.values())
@@ -119,7 +134,7 @@ class MinimalWord2Vec:
     def get_negative_samples(self, positive_idx: int) -> [int]:
         """
         Sample negative examples (words that don't actually appear in context).
-        Make sure we don't sample the positive example itself. 
+        Make sure we don't sample the positive example itself.
         """
         negative_samples = []
         while len(negative_samples) < self.negative_samples:
@@ -130,7 +145,7 @@ class MinimalWord2Vec:
 
     def sigmoid(self, x):
         """
-        Sigmoid function with numerical stability. 
+        Sigmoid function with numerical stability.
         """
         # Clip x to prevent overflow
         x = np.clip(x, -500, 500)
@@ -139,11 +154,11 @@ class MinimalWord2Vec:
     def train_pair(self, center_idx: int, context_idx: int):
         """
         Train on a single (center_word, context_word) pair using negative sampling.
-        This is where the actual learning happens! 
+        This is where the actual learning happens!
         """
         # Get embeddings for center and context words
-        center_embedding = self.W_in[center_idx] # Shape: (embedding_dim,)
-        context_embedding = self.W_out[context_idx] # Shape: (embedding_dim,)
+        center_embedding = self.W_in[center_idx]  # Shape: (embedding_dim,)
+        context_embedding = self.W_out[context_idx]  # Shape: (embedding_dim,)
 
         # Positive example: center and context actually appear together
         # We want this to have high probability (close to 1)
@@ -160,7 +175,7 @@ class MinimalWord2Vec:
 
         # Negative examples: these pairs don't actually appear together
         # We want these to have low probability (close to 0)
-        negative_samples = self.get_negative_samples(context_idx)      
+        negative_samples = self.get_negative_samples(context_idx)
 
         for neg_idx in negative_samples:
             neg_embedding = self.W_out[neg_idx]
@@ -180,7 +195,7 @@ class MinimalWord2Vec:
     def generate_training_pairs(self, sentences: [[str]]):
         """
         Generate (center_word, context_word) training pairs from sentences.
-        For each word, we look at surrounding words within the window. 
+        For each word, we look at surrounding words within the window.
         """
         pairs = []
         for sentence in sentences:
@@ -193,8 +208,11 @@ class MinimalWord2Vec:
             # Generate pairs for each word in the sentence
             for i, center_idx in enumerate(word_indices):
                 # Look at surrounding words within the window
-                for j in range(max(0, i - self.window_size), min(len(word_indices), i + self.window_size + 1)):
-                    if i != j: # Don't pair a word with itself
+                for j in range(
+                    max(0, i - self.window_size),
+                    min(len(word_indices), i + self.window_size + 1),
+                ):
+                    if i != j:  # Don't pair a word with itself
                         context_idx = word_indices[j]
                         pairs.append((center_idx, context_idx))
 
@@ -202,7 +220,7 @@ class MinimalWord2Vec:
 
     def train(self, text: str):
         """
-        Main training function. This orchestrates the entire training process. 
+        Main training function. This orchestrates the entire training process.
         """
         print("Preprocessing text...")
         words = self.preprocess_text(text)
@@ -213,17 +231,19 @@ class MinimalWord2Vec:
         for word in words:
             current_sentence.append(word)
             # Simple sentence boundary detection
-            if len(current_sentence) > 20: # Arbitrary sentence length
+            if len(current_sentence) > 20:  # Arbitrary sentence length
                 sentences.append(current_sentence)
                 current_sentence = []
-        if current_sentence: # Don't forget the last sentence
+        if current_sentence:  # Don't forget the last sentence
             sentences.append(current_sentence)
 
         print("Building vocabulary...")
         self.build_vocabulary(sentences)
 
         if self.vocab_size == 0:
-            raise ValueError("No words in vocabulary! Check your text and min_count parameter.")
+            raise ValueError(
+                "No words in vocabulary! Check your text and min_count parameter."
+            )
 
         print("Initializing embeddings...")
         self.initialize_embeddings()
@@ -246,7 +266,9 @@ class MinimalWord2Vec:
 
                 # Progress update
                 if i % 10000 == 0 and i > 0:
-                    print(f"Epoch {epoch + 1}/{self.epochs}, Pair {i}/{len(training_pairs)}")
+                    print(
+                        f"Epoch {epoch + 1}/{self.epochs}, Pair {i}/{len(training_pairs)}"
+                    )
 
             # Decay learning rate over time
             self.learning_rate *= 0.95
@@ -259,12 +281,12 @@ class MinimalWord2Vec:
         if word not in self.word_to_idx:
             raise KeyError(f"Word '{word}' not in vocabulary")
         idx = self.word_to_idx[word]
-        return self.W_in[idx] # Use input embeddings as final word vectors
+        return self.W_in[idx]  # Use input embeddings as final word vectors
 
     def most_similar(self, word: str, top_k: int = 10):
         """
         Find the most similar words to the given word using cosine similarity.
-        This is where you can see if the model learned meaningful relationships! 
+        This is where you can see if the model learned meaningful relationships!
         """
         if word not in self.word_to_idx:
             print(f"Word '{word}' not in vocabulary")
@@ -287,14 +309,15 @@ class MinimalWord2Vec:
             similarities.append((other_word, similarity))
 
         # Sort by similarity and return top k
-        similarities.sort(key=lambda x: x[1], reverse=True)      
+        similarities.sort(key=lambda x: x[1], reverse=True)
         return similarities[:top_k]
 
 
 # Example usage and demonstration
 if __name__ == "__main__":
     # Sample text for demonstration
-    sample_text = """
+    sample_text = (
+        """
     The king sat on his throne in the royal palace. The queen walked through the castle gardens.
     A man walked his dog in the park. The woman fed her cat some fish.
     The prince rode his horse to the village. The princess danced at the royal ball.
@@ -305,25 +328,27 @@ if __name__ == "__main__":
     Children play in the playground. Adults work in the office.
     The sun shines brightly in the sky. The moon glows softly at night.
     Water flows in the river. Trees grow in the forest.
-    """ * 50 # Repeat to have more training data
+    """
+        * 50
+    )  # Repeat to have more training data
 
     # Create and train the model
     model = MinimalWord2Vec(
-        embedding_dim=50,        # Smaller for demo
-        window_size=3,           # Look at 3 words on each side
-        min_count=3,             # Need at least 3 occurances
+        embedding_dim=50,  # Smaller for demo
+        window_size=3,  # Look at 3 words on each side
+        min_count=3,  # Need at least 3 occurances
         negative_samples=5,
         learning_rate=0.025,
-        epochs=5
+        epochs=5,
     )
 
     # Train the model
     model.train(sample_text)
 
     # Test the model
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("TESTING THE MODEL")
-    print("="*50)
+    print("=" * 50)
 
     test_words = ["king", "dog", "main", "castle"]
     for word in test_words:
